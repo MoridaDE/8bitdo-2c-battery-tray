@@ -11,7 +11,7 @@ Plasma-/StatusNotifier-Tray für den **8BitDo Ultimate 2C Wireless** (u. a. WUKO
 > **Entwicklung, Implementierung, USB/HID-Protokollversuche und diese Dokumentation
 > wurden vollständig von einer KI (Cursor Agent) erstellt.** Es gab keinen manuellen
 > Anwendungscode von Menschenhand — nur Anforderungen, Tests und Feedback durch
-> den Nutzer (Niels). Bitte entsprechend einordnen (Review, Security, Support).
+> Morida. Bitte entsprechend einordnen (Review, Security, Support).
 
 ## Features
 

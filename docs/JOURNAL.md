@@ -4,7 +4,7 @@ Ausführlicheres Log der KI-gestützten Entwicklung (Cursor Agent, 2026-10).
 
 ## Kontext
 
-Nutzerwunsch: Akkustand des Ultimate 2C unter Linux im Tray — ideal über
+Anforderung von Morida: Akkustand des Ultimate 2C unter Linux im Tray — ideal über
 2,4 GHz oder USB, nicht nur Bluetooth.
 
 ## Meilensteine
