@@ -1,34 +1,34 @@
-# Entwicklungsjournal — 8BitDo Ultimate 2C Battery Tray
+# Development journal — 8BitDo Ultimate 2C Battery Tray
 
-Ausführlicheres Log der KI-gestützten Entwicklung (Cursor Agent, 2026-10).
+Extended log of the AI-assisted development (Cursor Agent, 2026-10).
 
-## Kontext
+## Context
 
-Anforderung von Morida: Akkustand des Ultimate 2C unter Linux im Tray — ideal über
-2,4 GHz oder USB, nicht nur Bluetooth.
+Request from **Morida**: show Ultimate 2C battery in a Linux tray — ideally over
+2.4 GHz or USB, not only Bluetooth.
 
-## Meilensteine
+## Milestones
 
-| Phase | Ergebnis |
+| Phase | Result |
 |---|---|
-| USB 310a / xpad | Gerät erkannt, kein power_supply |
-| hidraw Features | Keine Battery-Reports |
-| usbmon / pyusb EP84 | Idle oft still |
-| Report 0x81 nach LED | Identify/RF ok, kein Akku |
-| Firmware-Doku (extern) | 2,4 GHz trägt Akku-Kanal nicht |
-| Bluetooth GATT | Live-% zuverlässig |
-| Spike-Filter USB→BT | Hohe Umschalt-Werte verwerfen |
-| UPower-Bug | Nur noch 8BitDo-Modelle matchen |
-| Lade-Schätzung + ETA | ~2 h, synct von Disk |
-| Repo-Split | Eigenständiges Projekt |
+| USB 310a / xpad | Device seen, no power_supply |
+| hidraw features | No battery reports |
+| usbmon / pyusb EP84 | Often silent when idle |
+| Report 0x81 after LED | Identify/RF OK, no battery |
+| Firmware docs (external) | 2.4 GHz does not carry battery channel |
+| Bluetooth GATT | Reliable live % |
+| Spike filter USB→BT | Drop high switch artefacts |
+| UPower bug | Match 8BitDo devices only |
+| Charge estimate + ETA | ~2 h, sync from disk |
+| Repo split | Standalone project |
 
-## Empfohlener Messweg
+## Recommended measurement path
 
-1. USB-Kabel trennen  
-2. Pad per Bluetooth verbinden  
-3. Tray zeigt Live-% und schreibt `last_bt` / `estimate`  
-4. Danach wieder 2,4 GHz / USB nach Bedarf  
+1. Unplug USB cable  
+2. Connect pad over Bluetooth  
+3. Tray shows live % and writes `last_bt` / `estimate`  
+4. Return to 2.4 GHz / USB as needed  
 
-## KI-Hinweis
+## AI notice
 
-Gesamte Codebasis und Docs: **100 % KI-generiert** (siehe README).
+Entire codebase and docs: **100% AI-generated** (see README).

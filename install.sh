@@ -26,10 +26,10 @@ install -m 0644 "$ROOT/packaging/8bitdo-2c-battery-tray.service" "$UNIT_DIR/"
 install -m 0644 "$ROOT/packaging/8bitdo-2c-battery-tray.desktop" "$AUTO_DIR/"
 install -m 0644 "$ROOT/packaging/8bitdo-2c-battery-tray.desktop" "$APP_DIR/"
 
-echo "Optional: udev-Regel (einmalig mit sudo):"
+echo "Optional udev rule (once, with sudo):"
 echo "  sudo cp $ROOT/packaging/71-8bitdo-2c-hidraw.rules /etc/udev/rules.d/"
 echo "  sudo udevadm control --reload && sudo udevadm trigger"
 
 systemctl --user daemon-reload
 systemctl --user enable --now 8bitdo-2c-battery-tray.service
-echo "Installiert. Status: 8bitdo-2c-battery-status"
+echo "Installed. Check status with: 8bitdo-2c-battery-status"
