@@ -11,6 +11,13 @@ mkdir -p "$SHARE" "$BIN" "$UNIT_DIR" "$AUTO_DIR" "$APP_DIR"
 install -m 0644 "$ROOT/src/backend.py" "$SHARE/backend.py"
 install -m 0755 "$ROOT/src/tray.py" "$SHARE/tray.py"
 install -m 0755 "$ROOT/src/status.py" "$SHARE/status.py"
+install -m 0644 "$ROOT/src/combined_tray.py" "$SHARE/combined_tray.py"
+
+MMX_SHARE="${XDG_DATA_HOME:-$HOME/.local/share}/mmx200-battery-tray"
+COMBINED=0
+if [[ -f "$MMX_SHARE/backend.py" ]]; then
+  COMBINED=1
+fi
 
 cat > "$BIN/8bitdo-2c-battery-tray" <<EOF
 #!/bin/sh
@@ -31,5 +38,12 @@ echo "  sudo cp $ROOT/packaging/71-8bitdo-2c-hidraw.rules /etc/udev/rules.d/"
 echo "  sudo udevadm control --reload && sudo udevadm trigger"
 
 systemctl --user daemon-reload
-systemctl --user enable --now 8bitdo-2c-battery-tray.service
-echo "Installed. Check status with: 8bitdo-2c-battery-status"
+if [[ "$COMBINED" -eq 1 ]]; then
+  systemctl --user disable --now 8bitdo-2c-battery-tray.service 2>/dev/null || true
+  systemctl --user try-restart mmx200-battery-tray.service 2>/dev/null || true
+  echo "Installed. MMX tray also present — combined StatusNotifier icon (mmx200-battery-tray hosts it)."
+  echo "CLI still available: 8bitdo-2c-battery-status"
+else
+  systemctl --user enable --now 8bitdo-2c-battery-tray.service
+  echo "Installed. Check status with: 8bitdo-2c-battery-status"
+fi

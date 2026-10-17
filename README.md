@@ -27,6 +27,7 @@ ohne Live-%. Vollständig KI-generiert (Cursor Agent), Feedback durch Morida.
 - USB charge estimate with ETA; calibrate from BT reading + timestamp
 - CLI: `8bitdo-2c-battery-status`
 - systemd user service + autostart
+- **Combined tray:** if [`mmx200-battery-tray`](https://github.com/MoridaDE/mmx200-battery-tray) is also installed, **one** StatusNotifier icon covers both devices (MMX hosts it; this unit stays disabled)
 
 ## Requirements
 
@@ -91,17 +92,18 @@ More detail: [`docs/JOURNAL.md`](docs/JOURNAL.md).
 ## Layout
 
 ```
-src/backend.py   # BlueZ/UPower, USB detect, spike filter, EstimateStore
-src/tray.py      # PyQt6 StatusNotifierItem
-src/status.py    # JSON CLI
-packaging/       # udev, systemd --user, .desktop
+src/backend.py        # BlueZ/UPower, USB detect, spike filter, EstimateStore
+src/tray.py           # PyQt6 StatusNotifierItem (solo; exits if combined)
+src/combined_tray.py  # Shared with MMX sister (same module, dual install)
+src/status.py         # JSON CLI
+packaging/            # udev, systemd --user, .desktop
 install.sh
 ```
 
 ## Sister project
 
-Beyerdynamic MMX 200: [`mmx200-battery-tray`](https://github.com/MoridaDE/mmx200-battery-tray)
-(same tray style, separate systemd unit).
+Beyerdynamic MMX 200: [`mmx200-battery-tray`](https://github.com/MoridaDE/mmx200-battery-tray).
+Install both → one combined tray icon (MMX unit hosts it; this unit is disabled).
 
 ## License
 

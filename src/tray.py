@@ -257,6 +257,17 @@ class TrayApp(QWidget):
 
 
 def main() -> None:
+    from combined_tray import both_installed  # noqa: E402
+
+    # MMX hosts the unified StatusNotifier icon when both apps are installed.
+    if both_installed():
+        print(
+            "8bitdo-2c-battery-tray: both trays installed — "
+            "combined UI runs via mmx200-battery-tray",
+            file=sys.stderr,
+        )
+        sys.exit(0)
+
     lock = os.path.join(CONFIG_DIR, "tray.lock")
     _ensure_config()
     try:
@@ -267,7 +278,7 @@ def main() -> None:
         try:
             old = int(open(lock, encoding="utf-8").read().strip())
             os.kill(old, 0)
-            print("8bitdo-2c-battery-tray läuft bereits", file=sys.stderr)
+            print("8bitdo-2c-battery-tray already running", file=sys.stderr)
             sys.exit(0)
         except (OSError, ValueError):
             os.remove(lock)
