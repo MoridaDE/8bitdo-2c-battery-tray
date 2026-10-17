@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=8BitDo 2C Battery
+Comment=Tray indicator for 8BitDo Ultimate 2C
+Exec=8bitdo-2c-battery-tray
+Icon=battery
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true
