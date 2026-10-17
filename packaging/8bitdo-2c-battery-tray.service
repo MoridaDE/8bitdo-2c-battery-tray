@@ -1,0 +1,14 @@
+[Unit]
+Description=8BitDo Ultimate 2C Battery Tray
+After=graphical-session.target plasma-plasmashell.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/share/8bitdo-2c-battery-tray/tray.py
+Restart=on-failure
+RestartSec=3
+Environment=QT_QPA_PLATFORM=wayland
+
+[Install]
+WantedBy=graphical-session.target
