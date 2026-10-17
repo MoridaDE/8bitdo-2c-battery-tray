@@ -67,6 +67,17 @@ Config: `~/.config/8bitdo-2c-battery/`
 **Tip:** For a clean reading, **unplug USB**, then connect Bluetooth — otherwise GATT
 may briefly spike to high artefact values when switching (filtered out).
 
+## Open goal / contributing
+
+The real goal is to read the battery **live and directly from the manufacturer
+dongle / USB path**, without needing Bluetooth. No working method has been found
+yet, so this project uses a Bluetooth GATT workaround (plus charge/estimate
+context when only the cable or 2.4 GHz receiver is in use).
+
+If you find a way to query capacity over the Ultimate 2C receiver or USB HID
+interfaces, please open an issue or pull request — contributions that replace or
+improve on the Bluetooth detour are very welcome.
+
 ## Development journal (protocol)
 
 1. **Goal:** Battery in a Linux tray (2.4 GHz and/or USB). Neither Windows nor the
