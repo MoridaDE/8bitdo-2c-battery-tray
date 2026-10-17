@@ -69,7 +69,8 @@ may briefly spike to high artefact values when switching (filtered out).
 
 ## Development journal (protocol)
 
-1. **Goal:** Battery in a Linux tray (2.4 GHz and/or USB), similar to Windows.
+1. **Goal:** Battery in a Linux tray (2.4 GHz and/or USB). Neither Windows nor the
+   official 8BitDo tooling exposes a system-tray battery for this pad.
 2. **USB `2dc8:310a`:** xpad on interface 0 (XInput) plus HID ifaces; no pad `power_supply`.
 3. **hidraw:** no spontaneous battery input reports; `GET_FEATURE` empty.
 4. **pyusb / EP 0x84:** often **no** interrupt IN packets while idle/charging.
