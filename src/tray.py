@@ -118,6 +118,8 @@ class TrayApp(QWidget):
             os.path.join(CONFIG_DIR, "estimate"),
             PAD_FULL_HOURS,
             charge_hours=_load_charge_hours(),
+            drain_hours_path=os.path.join(CONFIG_DIR, "drain_hours"),
+            drain_bounds=(8.0, 35.0),
         )
         self._warned = False
         self._full_warned = False
@@ -227,10 +229,14 @@ class TrayApp(QWidget):
         self.status.setText(text)
         show = pct if hw.connected else None
         self.tray.setIcon(_battery_icon(show, bool(hw.connected and pct is not None)))
+        hours = self.est.full_hours
+        learned = os.path.exists(os.path.join(CONFIG_DIR, "drain_hours"))
+        curve = f"Entladekurve ~{hours:.0f} h" + (" (gelernt)" if learned else " (Standard)")
         self.tray.setToolTip(
             text
+            + f"\n{curve}"
             + "\n\n~ = Schätzung\nLive-% nur per Bluetooth (ohne USB-Kabel)\n"
-            "USB-Kabel: Laden + Zeitschätzung (kein Hardware-Voll-Signal)"
+            "BT-Syncs lernen die Laufzeit aus der verbundenen Nutzungszeit nach"
         )
 
         level = int(self.state.get("notify_level", 20))

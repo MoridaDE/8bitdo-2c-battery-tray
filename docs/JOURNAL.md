@@ -29,6 +29,11 @@ Request from **Morida**: show Ultimate 2C battery in a Linux tray — ideally ov
 3. Tray shows live % and writes `last_bt` / `estimate`  
 4. Return to 2.4 GHz / USB as needed  
 
+## v1.1.0 (2026-10-29)
+
+Self-learning discharge hours from BT anchors using connected `drain_accum`
+(not wall clock). Charge-hours learning was already present. See `CHANGELOG.md`.
+
 ## AI notice
 
 Entire codebase and docs: **100% AI-generated** (see README).

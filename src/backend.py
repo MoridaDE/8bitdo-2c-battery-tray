@@ -73,8 +73,13 @@ class EightBitDo2CBackend:
     IDLE_PID = 0x301C  # 2.4 GHz receiver, pad off / not linked
     USB_PID = 0x310A  # USB cable (XInput / charging)
     LAST_BT_PATH = os.path.expanduser("~/.config/8bitdo-2c-battery/last_bt")
+    ESTIMATE_PATH = os.path.expanduser("~/.config/8bitdo-2c-battery/estimate")
     SAMPLES_PATH = os.path.expanduser("~/.config/8bitdo-2c-battery/charge_samples.json")
     CHARGE_HOURS_PATH = os.path.expanduser("~/.config/8bitdo-2c-battery/charge_hours")
+    DRAIN_HOURS_PATH = os.path.expanduser("~/.config/8bitdo-2c-battery/drain_hours")
+    DRAIN_SAMPLES_PATH = os.path.expanduser("~/.config/8bitdo-2c-battery/drain_samples.json")
+    DRAIN_HOURS_DEFAULT = 18.0
+    DRAIN_HOURS_BOUNDS = (8.0, 35.0)
 
     def __init__(self) -> None:
         self._last_hid_pct: Optional[int] = None
@@ -130,7 +135,7 @@ class EightBitDo2CBackend:
         if recent:
             baseline = sorted(recent)[len(recent) // 2]
         elif last is not None:
-            baseline = last
+            baseline = last[0]
         else:
             return False
         return pct >= baseline + 8
@@ -236,23 +241,38 @@ class EightBitDo2CBackend:
             pass
 
     def _commit_last_bt(self, pct: int) -> None:
+        """Commit a stabilized BT %; may learn drain_hours from prior dongle use."""
+        prev = self._load_last_bt()
+        now = time.time()
+        if prev is not None and abs(prev[0] - pct) < 1 and (now - prev[1]) < 600:
+            return
+        learn_drain_from_bt_anchor(
+            estimate_path=self.ESTIMATE_PATH,
+            drain_hours_path=self.DRAIN_HOURS_PATH,
+            samples_path=self.DRAIN_SAMPLES_PATH,
+            prev=prev,
+            new_pct=pct,
+            default_hours=self.DRAIN_HOURS_DEFAULT,
+            bounds=self.DRAIN_HOURS_BOUNDS,
+        )
         try:
             os.makedirs(os.path.dirname(self.LAST_BT_PATH), exist_ok=True)
             with open(self.LAST_BT_PATH, "w", encoding="utf-8") as fh:
-                fh.write(f"{pct} {time.time():.3f}\n")
-            est = os.path.expanduser("~/.config/8bitdo-2c-battery/estimate")
-            with open(est, "w", encoding="utf-8") as fh:
-                fh.write(f"{float(pct):.4f} {time.time():.3f}\n")
+                fh.write(f"{pct} {now:.3f}\n")
+            with open(self.ESTIMATE_PATH, "w", encoding="utf-8") as fh:
+                fh.write(f"{float(pct):.4f} {now:.3f} 0.000\n")
         except OSError:
             pass
 
-    def _load_last_bt(self) -> Optional[int]:
+    def _load_last_bt(self) -> Optional[tuple[int, float]]:
         try:
-            pct_s, _ts = open(self.LAST_BT_PATH, encoding="utf-8").read().split()
+            pct_s, ts_s = open(self.LAST_BT_PATH, encoding="utf-8").read().split()[:2]
             pct = int(float(pct_s))
-            return pct if 1 <= pct <= 100 else None
+            if 1 <= pct <= 100:
+                return pct, float(ts_s)
         except (OSError, ValueError):
-            return None
+            pass
+        return None
 
     def bluetooth_battery(self) -> Optional[tuple[int, bool, str]]:
         """Real % via BlueZ Battery1 / UPower gaming_input (GATT).
@@ -288,7 +308,7 @@ class EightBitDo2CBackend:
                         if connected and self.usb_cable_present():
                             last = self._load_last_bt()
                             if last is not None:
-                                return last, connected, "Bluetooth GATT (geglättet)"
+                                return last[0], connected, "Bluetooth GATT (geglättet)"
                         if connected:
                             return pct, connected, "Bluetooth GATT (stabilisiert…)"
                 if connected:
@@ -323,7 +343,7 @@ class EightBitDo2CBackend:
                     if self.usb_cable_present():
                         last = self._load_last_bt()
                         if last is not None:
-                            return last, True, "UPower/Bluetooth (geglättet)"
+                            return last[0], True, "UPower/Bluetooth (geglättet)"
                     return pct, True, "UPower/Bluetooth (stabilisiert…)"
         except Exception:
             pass
@@ -453,7 +473,7 @@ class EightBitDo2CBackend:
         if usb and not linked:
             detail = "USB · lädt (~2h-Schätzung, kein Voll-Signal)"
             if last_bt is not None:
-                detail += f" · Start BT {last_bt}%"
+                detail += f" · Start BT {last_bt[0]}%"
             if receiver:
                 detail += " · 2.4-GHz-Dongle idle"
             return DeviceSnapshot(
@@ -495,7 +515,7 @@ class EightBitDo2CBackend:
         if linked:
             detail = "2.4 GHz · kein Live-% (Schätzung)"
             if last_bt is not None:
-                detail += f" · kalibriert von BT {last_bt}%"
+                detail += f" · kalibriert von BT {last_bt[0]}%"
             if usb:
                 detail += " · + USB"
             return DeviceSnapshot(
@@ -519,11 +539,94 @@ class EightBitDo2CBackend:
         )
 
 
+def _read_drain_accum(estimate_path: str) -> float:
+    try:
+        data = open(estimate_path, encoding="utf-8").read().strip().split()
+        if len(data) >= 3:
+            return max(0.0, float(data[2]))
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0.0
+
+
+def load_drain_hours(path: str, default: float, bounds: tuple[float, float]) -> float:
+    lo, hi = bounds
+    try:
+        h = float(open(path, encoding="utf-8").read().split()[0])
+        if lo <= h <= hi:
+            return h
+    except (OSError, ValueError, IndexError):
+        pass
+    return default
+
+
+def learn_drain_from_bt_anchor(
+    *,
+    estimate_path: str,
+    drain_hours_path: str,
+    samples_path: str,
+    prev: Optional[tuple[int, float]],
+    new_pct: int,
+    default_hours: float,
+    bounds: tuple[float, float],
+    min_drop_pct: float = 3.0,
+    min_drain_hours: float = 0.35,
+    ema_alpha: float = 0.35,
+) -> Optional[float]:
+    """Update full→empty hours from connected drain time between two BT anchors."""
+    if prev is None:
+        return None
+    prev_pct, _prev_ts = prev
+    drop = float(prev_pct - new_pct)
+    if drop < min_drop_pct:
+        return None
+    hours_used = _read_drain_accum(estimate_path) / 3600.0
+    if hours_used < min_drain_hours:
+        return None
+    implied = 100.0 * hours_used / drop
+    lo, hi = bounds
+    if not (lo <= implied <= hi):
+        return None
+    current = load_drain_hours(drain_hours_path, default_hours, bounds)
+    learned = max(lo, min(hi, (1.0 - ema_alpha) * current + ema_alpha * implied))
+    try:
+        os.makedirs(os.path.dirname(drain_hours_path) or ".", exist_ok=True)
+        with open(drain_hours_path, "w", encoding="utf-8") as fh:
+            fh.write(
+                f"{learned:.4f} {time.time():.3f} implied={implied:.2f} {prev_pct}->{new_pct}\n"
+            )
+        import json
+
+        hist: list[dict] = []
+        if os.path.exists(samples_path):
+            try:
+                hist = json.loads(open(samples_path, encoding="utf-8").read())
+            except (OSError, json.JSONDecodeError, TypeError):
+                hist = []
+        hist.append(
+            {
+                "ts": time.time(),
+                "prev_pct": prev_pct,
+                "new_pct": new_pct,
+                "drop": drop,
+                "drain_hours_used": round(hours_used, 4),
+                "implied_full_hours": round(implied, 3),
+                "learned_full_hours": round(learned, 3),
+            }
+        )
+        with open(samples_path, "w", encoding="utf-8") as fh:
+            json.dump(hist[-40:], fh, indent=2)
+    except OSError:
+        return learned
+    return learned
+
+
 class EstimateStore:
     """Persisted coulomb-counter estimate when hardware % is unavailable.
 
-    drain_hours: empty→full discharge runtime
+    drain_hours: empty→full discharge runtime (default or learned from BT anchors)
     charge_hours: empty→full charge time (USB), optional
+    File format: ``percentage timestamp [drain_accum_seconds]``
     """
 
     def __init__(
@@ -531,12 +634,22 @@ class EstimateStore:
         path: str,
         drain_hours: float,
         charge_hours: Optional[float] = None,
+        drain_hours_path: Optional[str] = None,
+        drain_bounds: tuple[float, float] = (8.0, 35.0),
     ) -> None:
         self.path = path
-        self.full_hours = drain_hours
+        self.default_hours = drain_hours
+        self.drain_hours_path = drain_hours_path
+        self.drain_bounds = drain_bounds
+        self.full_hours = (
+            load_drain_hours(drain_hours_path, drain_hours, drain_bounds)
+            if drain_hours_path
+            else drain_hours
+        )
         self.charge_hours = charge_hours if charge_hours and charge_hours > 0 else None
         self.percentage = 70.0
         self.last_ts = time.time()
+        self.drain_accum_s = 0.0
         self._load()
 
     def _load(self) -> None:
@@ -546,13 +659,23 @@ class EstimateStore:
             data = open(self.path, encoding="utf-8").read().strip().split()
             self.percentage = float(data[0])
             self.last_ts = float(data[1])
+            if len(data) >= 3:
+                self.drain_accum_s = max(0.0, float(data[2]))
         except (OSError, ValueError, IndexError):
             pass
 
+    def reload_drain_hours(self) -> None:
+        if self.drain_hours_path:
+            self.full_hours = load_drain_hours(
+                self.drain_hours_path, self.default_hours, self.drain_bounds
+            )
+
     def save(self) -> None:
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
         with open(self.path, "w", encoding="utf-8") as fh:
-            fh.write(f"{self.percentage:.4f} {time.time():.3f}\n")
+            fh.write(
+                f"{self.percentage:.4f} {time.time():.3f} {self.drain_accum_s:.3f}\n"
+            )
 
     def set_percentage(self, pct: int) -> None:
         self.percentage = max(0.0, min(100.0, float(pct)))
@@ -561,17 +684,21 @@ class EstimateStore:
 
     def sync_from_disk(self) -> None:
         """Pick up calibrations written by backends (BT GATT) without restart."""
+        self.reload_drain_hours()
         if not os.path.exists(self.path):
             return
         try:
             data = open(self.path, encoding="utf-8").read().strip().split()
             file_pct = float(data[0])
             file_ts = float(data[1])
+            file_accum = float(data[2]) if len(data) >= 3 else None
         except (OSError, ValueError, IndexError):
             return
         if file_ts > self.last_ts + 0.05:
             self.percentage = max(0.0, min(100.0, file_pct))
             self.last_ts = file_ts
+            if file_accum is not None:
+                self.drain_accum_s = max(0.0, file_accum)
 
     def tick(self, draining: bool = False, charging: bool = False) -> int:
         now = time.time()
@@ -583,6 +710,7 @@ class EstimateStore:
                 self.percentage + (dt / 3600.0) * (100.0 / self.charge_hours),
             )
         elif draining and self.full_hours > 0:
+            self.drain_accum_s += dt
             self.percentage = max(
                 0.0, self.percentage - (dt / 3600.0) * (100.0 / self.full_hours)
             )

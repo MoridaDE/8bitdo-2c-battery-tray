@@ -24,7 +24,9 @@ ohne Live-%. Vollständig KI-generiert (Cursor Agent), Feedback durch Morida.
 
 - Own tray icon (same battery-theme look as the MMX sister project)
 - BT live % with spike filter (drop USB→BT switch artefacts ≥ +8 pp)
-- USB charge estimate with ETA; calibrate from BT reading + timestamp
+- Discharge estimate (~18 h default); **learns runtime** from BT sync pairs
+  (connected drain time + `%` drop → `drain_hours`)
+- USB charge estimate with ETA; charge hours can also be learned from BT samples
 - CLI: `8bitdo-2c-battery-status`
 - systemd user service + autostart
 - **Combined tray:** if [`mmx200-battery-tray`](https://github.com/MoridaDE/mmx200-battery-tray) is also installed, **one** StatusNotifier icon covers both devices (MMX hosts it; this unit stays disabled)
@@ -53,7 +55,7 @@ systemctl --user status 8bitdo-2c-battery-tray.service
 ```
 
 Config: `~/.config/8bitdo-2c-battery/`  
-(`estimate`, `last_bt`, `charge_samples.json`, `charge_hours`, `state.json`).
+(`estimate`, `last_bt`, `drain_hours`, `drain_samples.json`, `charge_samples.json`, `charge_hours`, `state.json`).
 
 ## Usage
 
@@ -62,7 +64,7 @@ Config: `~/.config/8bitdo-2c-battery/`
 | Bluetooth only (no USB cable) | live % (GATT) — best for calibration |
 | USB cable plugged | “charging” + estimate / ETA (no full-signal from host) |
 | 2.4 GHz receiver idle | disconnected / idle |
-| Brief BT while/after charging | refreshes `last_bt` + estimate |
+| Brief BT while/after charging | refreshes `last_bt` + estimate; may learn drain/charge hours |
 
 **Tip:** For a clean reading, **unplug USB**, then connect Bluetooth — otherwise GATT
 may briefly spike to high artefact values when switching (filtered out).
