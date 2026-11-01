@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.0 — 2026-11-01
+
+### Fixed
+- **Beenden** no longer tries to open a local popup menu. Plasma rejects that
+  on Wayland, so the entry never appeared. CLI: `8bitdo-2c-battery-tray --quit`.
+- When the MMX sister app is also installed, that host shows the quit window
+  for the combined icon (`Tray beenden`).
+
 ## v1.1.0 — 2026-10-29
 
 ### Added

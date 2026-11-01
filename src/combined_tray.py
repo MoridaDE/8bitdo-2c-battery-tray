@@ -163,8 +163,8 @@ class CombinedTrayApp(QWidget):
         act_refresh.triggered.connect(self.refresh)
         self.menu.addAction(act_refresh)
         self.menu.addSeparator()
-        act_quit = QAction("Quit")
-        act_quit.triggered.connect(QApplication.instance().quit)
+        act_quit = QAction("Beenden")
+        act_quit.triggered.connect(self._quit)
         self.menu.addAction(act_quit)
 
         self.tray.setContextMenu(self.menu)
@@ -177,6 +177,19 @@ class CombinedTrayApp(QWidget):
         self.timer.timeout.connect(self.refresh)
         self.timer.start()
         self.refresh()
+
+    def _quit(self) -> None:
+        try:
+            self.timer.stop()
+        except Exception:
+            pass
+        try:
+            self.tray.hide()
+        except Exception:
+            pass
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
 
     def _ask(self, which: str) -> None:
         store = self.mmx_est if which == "mmx" else self.pad_est

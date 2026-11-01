@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import json
 import os
+import signal
+import subprocess
 import sys
+import time
 from typing import Optional
 
 from PyQt6.QtCore import QTimer, Qt
@@ -152,9 +155,10 @@ class TrayApp(QWidget):
         self.menu.addAction(act_refresh)
         self.menu.addSeparator()
         act_quit = QAction("Beenden")
-        act_quit.triggered.connect(QApplication.instance().quit)
+        act_quit.triggered.connect(self._quit)
         self.menu.addAction(act_quit)
 
+        # Plasma draws this menu over DBus. Local popup() fails on Wayland.
         self.tray.setContextMenu(self.menu)
         self.tray.setToolTip("8BitDo 2C Battery")
         self.tray.setIcon(_battery_icon(None, False))
@@ -165,6 +169,19 @@ class TrayApp(QWidget):
         self.timer.timeout.connect(self.refresh)
         self.timer.start()
         self.refresh()
+
+    def _quit(self) -> None:
+        try:
+            self.timer.stop()
+        except Exception:
+            pass
+        try:
+            self.tray.hide()
+        except Exception:
+            pass
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
 
     def _ask_pct(self) -> None:
         val, ok = QInputDialog.getInt(
@@ -262,7 +279,82 @@ class TrayApp(QWidget):
             )
 
 
-def main() -> None:
+def stop_running(timeout_s: float = 3.0) -> int:
+    """Stop tray; ``killall battery`` does not work (process is python3)."""
+    subprocess.run(
+        ["systemctl", "--user", "stop", "8bitdo-2c-battery-tray.service"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    pids: set[int] = set()
+    lock = os.path.join(CONFIG_DIR, "tray.lock")
+    try:
+        pid = int(open(lock, encoding="utf-8").read().strip())
+        os.kill(pid, 0)
+        pids.add(pid)
+    except (OSError, ValueError):
+        pass
+    try:
+        out = subprocess.check_output(
+            ["pgrep", "-f", r"/8bitdo-2c-battery-tray/tray\.py"],
+            text=True,
+        )
+        for line in out.splitlines():
+            try:
+                pids.add(int(line.strip()))
+            except ValueError:
+                pass
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    for pid in sorted(pids):
+        if pid == os.getpid():
+            continue
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    alive: list[int] = []
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        alive = []
+        for pid in pids:
+            if pid == os.getpid():
+                continue
+            try:
+                os.kill(pid, 0)
+                alive.append(pid)
+            except OSError:
+                pass
+        if not alive:
+            break
+        time.sleep(0.1)
+    else:
+        for pid in alive:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+    try:
+        os.remove(lock)
+    except OSError:
+        pass
+    print("8bitdo-2c-battery-tray beendet")
+    return 0
+
+
+def main(argv: Optional[list[str]] = None) -> None:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if any(a in ("-h", "--help", "help") for a in argv):
+        print(
+            "Usage: 8bitdo-2c-battery-tray [--quit|--stop]\n"
+            "  --quit  Tray beenden (Menü: Beenden)\n"
+            "Hinweis: killall battery funktioniert nicht — Prozess heißt python3."
+        )
+        sys.exit(0)
+    if any(a in ("--quit", "--stop", "quit", "stop") for a in argv):
+        sys.exit(stop_running())
+
     from combined_tray import both_installed  # noqa: E402
 
     # MMX hosts the unified StatusNotifier icon when both apps are installed.
@@ -293,7 +385,7 @@ def main() -> None:
             os.close(fd)
 
     QApplication.setDesktopFileName("8bitdo-2c-battery-tray")
-    app = QApplication(sys.argv)
+    app = QApplication([sys.argv[0], *argv])
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("8BitDo 2C Battery")
     app.setApplicationDisplayName("8BitDo 2C Battery")
@@ -305,7 +397,13 @@ def main() -> None:
             pass
 
     app.aboutToQuit.connect(_cleanup)
-    _ = TrayApp()
+    tray_app = TrayApp()
+
+    def _on_term(*_args: object) -> None:
+        tray_app._quit()
+
+    signal.signal(signal.SIGTERM, _on_term)
+    signal.signal(signal.SIGINT, _on_term)
     sys.exit(app.exec())
 
 
